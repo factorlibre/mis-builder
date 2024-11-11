@@ -317,7 +317,11 @@ class AccountingExpressionProcessor:
         aml_model = aml_model.with_context(active_test=False)
         company_rates = self._get_company_rates(date_to)
         # {(domain, mode): {account_id: (debit, credit)}}
-        self._data = defaultdict(lambda: defaultdict(lambda: SimpleArray((0.0, 0.0))))
+        self._data = defaultdict(
+            lambda: defaultdict(
+                lambda: SimpleArray((AccountingNone, AccountingNone)),
+            )
+        )
         domain_by_mode = {}
         ends = []
         for key in self._map_account_ids:
