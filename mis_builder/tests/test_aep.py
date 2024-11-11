@@ -437,9 +437,21 @@ class TestAEP(common.TransactionCase):
         branch_move.company_id = self.branch
         self.aep = AEP(self.company | self.branch)
         self.aep.parse_expr("balp[]")
+        self.aep.parse_expr("bale[]")
+        self.aep.parse_expr("bali[]")
         self.aep.done_parsing()
+        # test variation and ending balance
         self._do_queries(
             datetime.date(self.curr_year, 3, 1), datetime.date(self.curr_year, 3, 31)
         )
         variation = self._eval_by_account_id("balp[]")
         self.assertEqual(variation, {self.account_ar.id: 550, self.account_in.id: -550})
+        ending = self._eval_by_account_id("bale[]")
+        self.assertEqual(ending, {self.account_ar.id: 950, self.account_in.id: -850})
+        # initial balance at beginning of the next period is the ending balance
+        # of previous period
+        self._do_queries(
+            datetime.date(self.curr_year, 4, 1), datetime.date(self.curr_year, 4, 30)
+        )
+        initial = self._eval_by_account_id("bali[]")
+        self.assertEqual(initial, {self.account_ar.id: 950, self.account_in.id: -850})
