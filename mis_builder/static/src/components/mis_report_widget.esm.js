@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import Dialog from "web.Dialog";
-import {Component, onWillStart, useState, useSubEnv} from "@odoo/owl";
+import {Component, onMounted, onWillStart, useState, useSubEnv} from "@odoo/owl";
 import {DatePicker} from "@web/core/datepicker/datepicker";
 import {FilterMenu} from "@web/search/filter_menu/filter_menu";
 import {SearchBar} from "@web/search/search_bar/search_bar";
@@ -36,6 +36,8 @@ export class MisReportWidget extends Component {
             this.refresh();
         });
         onWillStart(this.willStart);
+
+        onMounted(this._onMounted);
     }
 
     // Lifecycle
@@ -52,6 +54,7 @@ export class MisReportWidget extends Component {
                 "widget_show_pivot_date",
                 "user_can_read_annotation",
                 "user_can_edit_annotation",
+                "wide_display_by_default",
             ],
             {context: this.context}
         );
@@ -70,10 +73,16 @@ export class MisReportWidget extends Component {
             });
         }
 
+        this.wide_display = result.wide_display_by_default;
+
         // Compute the report
         this.refresh();
         this.state.can_edit_annotation = result.user_can_edit_annotation;
         this.state.can_read_annotation = result.user_can_read_annotation;
+    }
+
+    async _onMounted() {
+        this.resize_sheet();
     }
 
     get showSearchBar() {
@@ -253,6 +262,22 @@ export class MisReportWidget extends Component {
     onDateTimeChanged(ev) {
         this.state.pivot_date = ev;
         this.refresh();
+    }
+
+    async toggle_wide_display() {
+        this.wide_display = !this.wide_display;
+        this.resize_sheet();
+    }
+
+    async resize_sheet() {
+        var sheet_element = document.getElementsByClassName("o_form_sheet")[0];
+        sheet_element.classList.toggle(
+            "oe_mis_builder_report_wide_sheet",
+            this.wide_display
+        );
+        var button_resize_element = document.getElementById("icon_resize");
+        button_resize_element.classList.toggle("fa-expand", !this.wide_display);
+        button_resize_element.classList.toggle("fa-compress", this.wide_display);
     }
 }
 

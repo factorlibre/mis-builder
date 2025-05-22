@@ -588,6 +588,10 @@ class MisReportInstance(models.Model):
         compute="_compute_user_can_edit_annotation",
     )
 
+    wide_display_by_default = fields.Boolean(
+        string="Open report in wide mode by default",
+    )
+
     @api.depends("report_id.move_lines_source")
     def _compute_widget_search_view_id(self):
         for rec in self:
