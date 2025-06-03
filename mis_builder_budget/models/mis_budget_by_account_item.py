@@ -25,7 +25,10 @@ class MisBudgetByAccountItem(models.Model):
         currency_field="company_currency_id",
     )
     company_id = fields.Many2one(
-        "res.company", compute="_compute_company_id", store=True
+        comodel_name="res.company",
+        string="Company",
+        default=lambda self: self.env.company,
+        required=True,
     )
     company_currency_id = fields.Many2one(
         "res.currency",
@@ -38,6 +41,7 @@ class MisBudgetByAccountItem(models.Model):
         comodel_name="account.account",
         string="Account",
         required=True,
+        check_company=True,
     )
 
     _sql_constraints = [
@@ -54,15 +58,6 @@ class MisBudgetByAccountItem(models.Model):
             "Credit and debit should be positive.",
         ),
     ]
-
-    @api.depends_context("company")
-    @api.depends("account_id")
-    def _compute_company_id(self):
-        for rec in self:
-            if self.env.company in rec.account_id.company_ids:
-                rec.company_id = self.env.company
-            else:
-                rec.company_id = rec.account_id.company_ids[0]
 
     @api.depends("debit", "credit")
     def _compute_balance(self):
