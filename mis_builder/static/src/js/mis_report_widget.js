@@ -101,6 +101,13 @@ odoo.define("mis_builder.widget", function (require) {
         willStart: function () {
             var self = this;
             var context = self.getParent().state.context;
+            var is_returning = sessionStorage.getItem('mis_report_is_returning');
+            if (is_returning) {
+                sessionStorage.removeItem('mis_report_is_returning');
+                context.bypass_stored_result = false;
+            } else {
+                context.bypass_stored_result = true;
+            }
 
             var def1 = self
                 ._rpc({
@@ -387,6 +394,7 @@ odoo.define("mis_builder.widget", function (require) {
             var self = this;
             var context = self.getParent().state.context;
             var drilldown = $(event.target).data("drilldown");
+            sessionStorage.setItem('mis_report_is_returning', true);
             this._rpc({
                 model: "mis.report.instance",
                 method: "drilldown",

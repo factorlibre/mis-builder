@@ -14,3 +14,4 @@ from . import test_period_dates
 from . import test_render
 from . import test_simple_array
 from . import test_utc_midnight
+from . import test_mis_report_stored_result

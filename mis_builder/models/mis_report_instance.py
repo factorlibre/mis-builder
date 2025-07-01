@@ -4,6 +4,8 @@
 
 import datetime
 import logging
+import json
+import hashlib
 
 from dateutil.relativedelta import relativedelta
 
@@ -687,6 +689,8 @@ class MisReportInstance(models.Model):
     def preview(self):
         self.ensure_one()
         view_id = self.env.ref("mis_builder." "mis_report_instance_result_view_form")
+        context = self._context_with_filters()
+        context["bypass_stored_result"] = True
         return {
             "type": "ir.actions.act_window",
             "res_model": "mis.report.instance",
@@ -695,7 +699,7 @@ class MisReportInstance(models.Model):
             "view_type": "form",
             "view_id": view_id.id,
             "target": "current",
-            "context": self._context_with_filters(),
+            "context": context,
         }
 
     def print_pdf(self):
@@ -815,8 +819,45 @@ class MisReportInstance(models.Model):
 
     def compute(self):
         self.ensure_one()
+        bypass_stored_result = self.env.context.get("bypass_stored_result", False)
+        Result = self.env["mis.report.stored.result"]
+        report_key = self._generate_report_key()
+        domain = [
+            ("report_instance_id", "=", self.id),
+            ("user_id", "=", self.env.user.id),
+            ("report_key", "=", report_key),
+        ]
+        result_entry = Result.search(domain, limit=1)
+        if result_entry and not bypass_stored_result:
+            return json.loads(result_entry.computation_result)
         kpi_matrix = self._compute_matrix()
-        return kpi_matrix.as_dict()
+        result_dict = kpi_matrix.as_dict()
+        vals = {
+            "computation_result": json.dumps(result_dict),
+            "last_computed": fields.Datetime.now(),
+        }
+        if result_entry:
+            result_entry.write(vals)
+        else:
+            vals.update(
+                {
+                    "report_instance_id": self.id,
+                    "user_id": self.env.user.id,
+                    "report_key": report_key,
+                    "last_computed": fields.Datetime.now(),
+                }
+            )
+            Result.create(vals)
+        return result_dict
+
+
+    def _generate_report_key(self):
+        self.ensure_one()
+        hasher = hashlib.sha256()
+        filters = self.env.context.get('mis_report_filters', {})
+        encoded_filters = json.dumps(filters, sort_keys=True).encode('utf-8')
+        hasher.update(encoded_filters)
+        return hasher.hexdigest()
 
     def drilldown(self, arg):
         self.ensure_one()
