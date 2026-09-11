@@ -350,6 +350,7 @@ class AccountingExpressionProcessor(object):
                 domain,
                 ["debit", "credit", "account_id", "company_id"],
                 ["account_id", "company_id"],
+                orderby="id",
                 lazy=False,
             )
             for acc in accs:

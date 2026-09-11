@@ -413,3 +413,56 @@ class TestAEP(common.TransactionCase):
         )
         # let's see if there was a match
         self.assertEqual(self._eval(expr), -100)
+
+    def test_read_group_group_by_has_no_joined_columns(self):
+        """The AEP aggregate query must not group by columns of joined tables.
+
+        read_group() groups by account_id and company_id, both many2one. With no
+        explicit orderby, Odoo orders by the groupby fields themselves, joins
+        account_account and res_company to honour their _order, and SQL then
+        requires those columns in the GROUP BY. With them the planner
+        misestimates the number of groups by several orders of magnitude,
+        discards the HashAggregate and sorts the whole selection on disk.
+        """
+        self.aep.done_parsing()
+        cr = self.env.cr
+        original_execute = cr.execute
+        aggregate_queries = []
+
+        def capture(query, params=None, log_exceptions=None):
+            if (
+                isinstance(query, str)
+                and "account_move_line" in query
+                and "GROUP BY" in query.upper()
+            ):
+                aggregate_queries.append(query)
+            return original_execute(query, params, log_exceptions=log_exceptions)
+
+        cr.execute = capture
+        try:
+            self._do_queries(
+                datetime.date(self.prev_year, 12, 1),
+                datetime.date(self.prev_year, 12, 31),
+            )
+        finally:
+            cr.execute = original_execute
+
+        # Without this the test would pass even if nothing was captured.
+        self.assertTrue(
+            aggregate_queries,
+            "No aggregate query on account_move_line was captured: "
+            "the test is not exercising the AEP read_group.",
+        )
+        for sql in aggregate_queries:
+            group_by = sql.upper().split("GROUP BY", 1)[1]
+            group_by = group_by.split("ORDER BY", 1)[0]
+            # Odoo aliases joined tables as "account_move_line__account_id", so
+            # looking for the real table name never matches: require every
+            # grouped column to belong to account_move_line itself.
+            for term in [x.strip() for x in group_by.split(",") if x.strip()]:
+                self.assertTrue(
+                    term.startswith('"ACCOUNT_MOVE_LINE".'),
+                    "GROUP BY includes %s, which is not an account_move_line "
+                    "column. read_group is joining another table to order "
+                    "the result:\n%s" % (term, sql),
+                )
